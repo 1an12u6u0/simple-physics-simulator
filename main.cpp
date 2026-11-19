@@ -60,6 +60,35 @@ class Ball{
 
                 //convert to radians
                 float rad=ConvertToRadians(angle);
+                Vector2 v0={
+                    float(v*cos(rad)),
+                    float(v*sin(rad))
+                };
+
+                float totalT=TotalTime(v0);
+
+                //stop when elapsed time is bigger than total time
+                //this meas the ball has hit the ground
+
+                if(ETime>=totalT){
+                    ETime=totalT;
+                    Launched=false;
+                }
+
+                //calculate pos at each time
+                Vector2 d={
+                    //convert the results to px
+                    // v0.x*ETime
+                    // v0.y*ETime-(g*ETime*ETime)/2.0f
+                    Convert(ConvertMode::m_to_px,v0.x*ETime),
+                    Convert(ConvertMode::m_to_px,v0.y*ETime-(g*ETime*ETime)/2.0f)
+                };
+
+                //update the current pos
+                pos.x=StartPos.x+d.x;
+                pos.y=StartPos.y-d.y;
+
+
             }
 
         }
@@ -76,7 +105,7 @@ class Ball{
             //without drag
 
             //convert degrees to radians
-            float rad=angle*(PI/180.0f);
+            float rad=ConvertToRadians(angle);
 
             //convert the angle and velocity to a v0 Vector
             Vector2 v0={
@@ -89,6 +118,8 @@ class Ball{
             //and for less accuracy we decrease it
 
             float DeltaT=TotalTime(v0)/N;
+            Vector2 TPos=StartPos;//separate trajectory pos so when the program calculates
+                                // the balls trajectory it doesnt use the balls actual pos
 
             for(size_t i=0;i<=N;i++){
                 float T=i*DeltaT;
@@ -96,17 +127,17 @@ class Ball{
                 float dx_m=v0.x*T;
                 float dy_m=v0.y*T-(g*T*T)/2.0f;
 
-                pos={
+                TPos={
                     StartPos.x+Convert(ConvertMode::m_to_px,dx_m),
                     StartPos.y-Convert(ConvertMode::m_to_px,dy_m)
                 };
 
-                DrawCircleV(pos,2,BLUE);
+                DrawCircleV(TPos,2,BLUE);
             }
         }
 
         void draw(){
-            DrawCircleV(StartPos,r,RED);
+            DrawCircleV(pos,r,RED);
             DrawTrajectory();
         }
 };
