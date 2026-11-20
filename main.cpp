@@ -2,8 +2,12 @@
 #define RAYGUI_IMPLEMENTATION
 #include <raygui.h>
 
-const int ScreenWidth =1400;
-const int ScreenHeight= 900;
+#if defined(PLATFORM_WEB)
+    #include <emscripten/emscripten.h>
+#endif
+
+const int ScreenWidth =1920;
+const int ScreenHeight= 1080;
 
 const int FloorHeight=ScreenHeight-100;
 
@@ -298,45 +302,43 @@ void DrawGrid(Vector2 origin){
     }
 }
 
+//dont know how to do the web app thing :(
+
+//written by AI
+Ball* ball = nullptr;
+Input* input = nullptr;
+
+void UpdateDrawFrame(){
+    ball->updateAngleVal(input->GetAngleVal());
+    ball->updatev(input->Getv());
+    ball->update();
+
+    BeginDrawing();
+    ClearBackground(GetColor(GuiGetStyle(DEFAULT,BACKGROUND_COLOR)));
+    DrawGrid(ball->GetStartPos());
+    input->draw();
+    DrawLine(0,FloorHeight,ScreenWidth,FloorHeight,GetColor(GuiGetStyle(DEFAULT,LINE_COLOR)));
+    ball->draw();
+    EndDrawing();
+}
+
 int main(){
-
-    InitWindow(
-        ScreenWidth,
-        ScreenHeight,
-        "simple physics simulator"
-    );
-    SetTargetFPS(60);
-
-    //set a nice style
+    InitWindow(ScreenWidth, ScreenHeight, "simple physics simulator");
     GuiLoadStyle("resources/style_amber.rgs");
 
-    Ball ball;
-    Input input;
+    ball = new Ball;
+    input = new Input;
 
-    while(!WindowShouldClose()){    
-        //inputs ,then update, then draw
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
+#else
+    SetTargetFPS(60);
+    while(!WindowShouldClose()) UpdateDrawFrame();
+#endif
 
-        ball.updateAngleVal(input.GetAngleVal());
-        ball.updatev(input.Getv());
-
-
-        ball.update();
-
-        BeginDrawing();
-        
-        ClearBackground(GetColor(GuiGetStyle(DEFAULT,BACKGROUND_COLOR)));
-
-        DrawGrid(ball.GetStartPos());
-        input.draw();
-        //draw gorund line
-        DrawLine(0,FloorHeight,ScreenWidth,FloorHeight,GetColor(GuiGetStyle(DEFAULT,LINE_COLOR)));
-        ball.draw();
-
-
-        EndDrawing();
-    }
-
+    delete ball;
+    delete input;
     CloseWindow();
-
     return 0;
 }
+//written by AI
