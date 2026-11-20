@@ -2,15 +2,13 @@
 #define RAYGUI_IMPLEMENTATION
 #include <raygui.h>
 
-#include <iostream>
-using std::cerr;
-
 const int ScreenWidth =1400;
 const int ScreenHeight= 900;
 
 const int FloorHeight=ScreenHeight-100;
 
-#include <vector>
+#include <string>
+using std::string;
 
 //watched https://www.youtube.com/watch?v=7knY1U-ysY4
 
@@ -46,6 +44,9 @@ class Ball{
 
         bool Launched=false;
         float ETime=0.0f;
+
+        Color BallColor=GetColor(GuiGetStyle(DEFAULT,LINE_COLOR));
+        Color TrajectoryColor=RAYWHITE;
     public:
         //formulas used http://hyperphysics.phy-astr.gsu.edu/hbase/traj.html
 
@@ -99,9 +100,49 @@ class Ball{
                 pos.y=StartPos.y-d.y;
 
             }
-            else pos=StartPos;
 
         }
+
+
+
+
+        //made by AI
+        void DrawReadouts(){
+            int   a = Launched ? launchAngle : angle;
+            float s = Launched ? launchV     : v;
+            float rad = ConvertToRadians(a);
+
+            float vx  = s*cos(rad);          // constant the whole flight
+            float vy0 = s*sin(rad);
+
+            // predicted values (they only depend on the launch)
+            float T = 2*vy0/g;               // flight time
+            float H = vy0*vy0/(2*g);         // max height
+            float R = vx*T;                  // range
+
+            // live values (they depend on elapsed time)
+            float t     = Launched ? ETime : 0.0f;
+            float vy    = vy0 - g*t;
+            float speed = sqrt(vx*vx + vy*vy);
+            float x     = vx*t;
+            float y     = vy0*t - (g*t*t)/2.0f;
+
+            std::string lines[] = {
+                TextFormat("Flight time: %.2f s", T),
+                TextFormat("Max height:  %.2f m", H),
+                TextFormat("Range:       %.2f m", R),
+                TextFormat("Time:        %.2f s", t),
+                TextFormat("Position:    (%.1f, %.1f) m", x, y),
+                TextFormat("Speed:       %.2f m/s", speed),
+            };
+            for(int i=0;i<6;i++)
+                DrawText(lines[i].c_str(), 20, 20+i*24, 20, GetColor(GuiGetStyle(DEFAULT,TEXT)));
+        }
+        //made by AI
+
+
+
+
 
 
         //calculate the time needed for the ball to collide with the ground;
@@ -109,7 +150,6 @@ class Ball{
             return (2*v0.y)/g;
         }
 
-        int N=100;
 
         void DrawTrajectory(){
             //now that we set up locked vals
@@ -148,6 +188,10 @@ class Ball{
             //return(stop) if the ball already stopped
             if(remainingT<=0.0f) return;
 
+            //make this dynamic bc in the start there are too little dots
+            //and in the end too many
+            int N=std::max(10,int(remainingT/0.05f));
+
             float DeltaT=remainingT/N;
 
             Vector2 TPos=StartPos;//separate trajectory pos so when the program calculates
@@ -165,54 +209,96 @@ class Ball{
                     StartPos.y-Convert(ConvertMode::m_to_px,dy_m)
                 };
 
-                DrawCircleV(TPos,2,BLUE);
+                DrawCircleV(TPos,2,GRAY);
             }
         }
 
         void draw(){
             DrawTrajectory();
-            DrawCircleV(pos,r,RED);
+            DrawCircleV(pos,r,BallColor);
+            DrawReadouts();
         }
 
         //functions that allow the update of the angle and velocity
         void updateAngleVal(int val){ angle=val; };
         void updatev(float nv){v=nv;};
+
+        //get the startpos of ball
+        Vector2 GetStartPos(){ return StartPos; };
 };
 
 class Input{
     private:
-        Rectangle AngleRec={10,10,200,100};
-        float AngleVal=0;
-        Rectangle vRec={400,10,200,100};
-        float v=0.0f;
+        //sliders
+        Rectangle AngleRec={20,ScreenHeight-50,200,30};
+        float AngleVal=50;
+        Rectangle vRec={300,ScreenHeight-50,200,30};
+        float v=19.0f;
+
     public:
         void draw(){
+            //text
+            string AngleTxt=TextFormat("Angle: %02i",int(AngleVal));
+            DrawText(
+                AngleTxt.c_str(),
+                AngleRec.x+(AngleRec.width-MeasureText(AngleTxt.c_str(),20))/2,
+                AngleRec.y-30,
+                20,
+                GetColor(GuiGetStyle(DEFAULT,TEXT))
+            );
+
+            string vTxt=TextFormat("Velocity: %02.02f",v);
+            DrawText(
+                vTxt.c_str(),
+                vRec.x+(vRec.width-MeasureText(vTxt.c_str(),20))/2,
+                vRec.y-30,
+                20,
+                GetColor(GuiGetStyle(DEFAULT,TEXT))
+            );
+
             //angle slider
-            GuiSliderBar(
+            GuiSlider(
                 AngleRec,
-                "0",
+                "1",
                 "90",
                 &AngleVal,
-                0,
+                1,
                 90
             );
             //velocity slider
-            GuiSliderBar(
+            GuiSlider(
                 vRec,
                 "1",
-                "30",
+                "25",
                 &v,
                 1.0f,
-                30.0f
+                25.0f
             );
         }
         int GetAngleVal(){ return int(AngleVal); };
         float Getv(){ return v; };
 };
 
+//need to add origin so the grid isnt offseted
+void DrawGrid(Vector2 origin){
+    //draw a simple grid that helps viusalizing the px to m scale
+    Color GridColor=Fade(LIGHTGRAY,0.3f);
+    float StepPx=scale;
+
+    int i=0;
+    for(float x=origin.x;x<ScreenWidth;x+=StepPx,i++){
+        DrawLine(x,0,x,float(FloorHeight),GridColor);
+        DrawText(TextFormat("%i",i),x+2,FloorHeight+4,10,GridColor);
+    }
+
+    i=0;
+    for(float y=origin.y;y>0;y-=StepPx,i++){
+        DrawLine(0,y,ScreenWidth,y,GridColor);
+        DrawText(TextFormat("%i",i),4,y-12,10,GridColor);
+    }
+}
+
 int main(){
-    Ball ball;
-    Input input;
 
     InitWindow(
         ScreenWidth,
@@ -220,6 +306,12 @@ int main(){
         "simple physics simulator"
     );
     SetTargetFPS(60);
+
+    //set a nice style
+    GuiLoadStyle("resources/style_amber.rgs");
+
+    Ball ball;
+    Input input;
 
     while(!WindowShouldClose()){    
         //inputs ,then update, then draw
@@ -232,11 +324,14 @@ int main(){
 
         BeginDrawing();
         
-        ClearBackground(WHITE);
+        ClearBackground(GetColor(GuiGetStyle(DEFAULT,BACKGROUND_COLOR)));
+
+        DrawGrid(ball.GetStartPos());
         input.draw();
         //draw gorund line
-        DrawLine(0,FloorHeight,ScreenWidth,FloorHeight,RED);
+        DrawLine(0,FloorHeight,ScreenWidth,FloorHeight,GetColor(GuiGetStyle(DEFAULT,LINE_COLOR)));
         ball.draw();
+
 
         EndDrawing();
     }
