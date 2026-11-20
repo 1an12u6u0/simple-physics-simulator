@@ -6,8 +6,8 @@
     #include <emscripten/emscripten.h>
 #endif
 
-const int ScreenWidth =1920;
-const int ScreenHeight= 1080;
+const int ScreenWidth =1400;
+const int ScreenHeight= 900;
 
 const int FloorHeight=ScreenHeight-100;
 
