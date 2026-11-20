@@ -2,7 +2,6 @@
 #define RAYGUI_IMPLEMENTATION
 #include <raygui.h>
 
-#include <raymath.h>
 #include <iostream>
 using std::cerr;
 
@@ -10,7 +9,6 @@ const int ScreenWidth =1400;
 const int ScreenHeight= 900;
 
 const int FloorHeight=ScreenHeight-100;
-
 
 #include <vector>
 
@@ -41,6 +39,11 @@ class Ball{
         int angle=70; //angle at which ball is thrown
         float v=25.0f;   //the velocity,needs to be positive
 
+        //we need to lock the angle and velocity values
+        //so the sliders dont change the outcome we expect
+        int launchAngle=45;
+        float launchV=25.0f;
+
         bool Launched=false;
         float ETime=0.0f;
     public:
@@ -48,10 +51,16 @@ class Ball{
 
         void update(){
             //when space is pressed launch ball
-            if(IsKeyPressed(KEY_SPACE)){
+
+            //only if ball isnt already launched
+            if(!Launched&&IsKeyPressed(KEY_SPACE)){
                 Launched=true;
                 ETime=0.0f;
                 pos=StartPos;
+
+                //update the launch vars with the input
+                launchV=v;
+                launchAngle=angle;
             };
 
             if(Launched){
@@ -59,20 +68,21 @@ class Ball{
                 ETime+=GetFrameTime();
 
                 //convert to radians
-                float rad=ConvertToRadians(angle);
+                float rad=ConvertToRadians(launchAngle);
                 Vector2 v0={
-                    float(v*cos(rad)),
-                    float(v*sin(rad))
+                    float(launchV*cos(rad)),
+                    float(launchV*sin(rad))
                 };
 
                 float totalT=TotalTime(v0);
 
                 //stop when elapsed time is bigger than total time
-                //this meas the ball has hit the ground
+                //this means the ball has hit the ground
 
                 if(ETime>=totalT){
                     ETime=totalT;
                     Launched=false;
+                    pos=StartPos;
                 }
 
                 //calculate pos at each time
@@ -88,8 +98,8 @@ class Ball{
                 pos.x=StartPos.x+d.x;
                 pos.y=StartPos.y-d.y;
 
-
             }
+            else pos=StartPos;
 
         }
 
@@ -102,27 +112,50 @@ class Ball{
         int N=100;
 
         void DrawTrajectory(){
+            //now that we set up locked vals
+            //we need to change the preview method
+
+            //if the ball is launched we stick to the launch vals
+            //else we use the users input to preview the trajectory
+            int activeAngle=Launched?launchAngle:angle;
+            float activeV=Launched?launchV:v;
+
             //without drag
 
             //convert degrees to radians
-            float rad=ConvertToRadians(angle);
+            float rad=ConvertToRadians(activeAngle);
 
             //convert the angle and velocity to a v0 Vector
             Vector2 v0={
-                float(v*cos(rad)),
-                float(v*sin(rad))
+                float(activeV*cos(rad)),
+                float(activeV*sin(rad))
             };
 
             //time step so we know how much to loop
             //for more accuracy we increase the N
             //and for less accuracy we decrease it
 
-            float DeltaT=TotalTime(v0)/N;
+            //we need to add an offset so the trajectory can update
+            //if our ball is moving
+
+            float totalT=TotalTime(v0);
+
+            //if the ball is launched we start from ETime
+            //else the ball hasnt started moving and we start from 0
+            float startT=Launched?ETime:0.0f;
+            float remainingT=totalT-startT;
+
+            //return(stop) if the ball already stopped
+            if(remainingT<=0.0f) return;
+
+            float DeltaT=remainingT/N;
+
             Vector2 TPos=StartPos;//separate trajectory pos so when the program calculates
                                 // the balls trajectory it doesnt use the balls actual pos
 
             for(size_t i=0;i<=N;i++){
-                float T=i*DeltaT;
+                //aplly offset
+                float T=startT+i*DeltaT;
                 
                 float dx_m=v0.x*T;
                 float dy_m=v0.y*T-(g*T*T)/2.0f;
@@ -137,14 +170,49 @@ class Ball{
         }
 
         void draw(){
-            DrawCircleV(pos,r,RED);
             DrawTrajectory();
+            DrawCircleV(pos,r,RED);
         }
+
+        //functions that allow the update of the angle and velocity
+        void updateAngleVal(int val){ angle=val; };
+        void updatev(float nv){v=nv;};
 };
 
+class Input{
+    private:
+        Rectangle AngleRec={10,10,200,100};
+        float AngleVal=0;
+        Rectangle vRec={400,10,200,100};
+        float v=0.0f;
+    public:
+        void draw(){
+            //angle slider
+            GuiSliderBar(
+                AngleRec,
+                "0",
+                "90",
+                &AngleVal,
+                0,
+                90
+            );
+            //velocity slider
+            GuiSliderBar(
+                vRec,
+                "1",
+                "30",
+                &v,
+                1.0f,
+                30.0f
+            );
+        }
+        int GetAngleVal(){ return int(AngleVal); };
+        float Getv(){ return v; };
+};
 
 int main(){
     Ball ball;
+    Input input;
 
     InitWindow(
         ScreenWidth,
@@ -153,15 +221,23 @@ int main(){
     );
     SetTargetFPS(60);
 
-    while(!WindowShouldClose()){
+    while(!WindowShouldClose()){    
+        //inputs ,then update, then draw
+
+        ball.updateAngleVal(input.GetAngleVal());
+        ball.updatev(input.Getv());
+
+
         ball.update();
 
         BeginDrawing();
         
         ClearBackground(WHITE);
-        ball.draw();
+        input.draw();
+        //draw gorund line
         DrawLine(0,FloorHeight,ScreenWidth,FloorHeight,RED);
-        
+        ball.draw();
+
         EndDrawing();
     }
 
